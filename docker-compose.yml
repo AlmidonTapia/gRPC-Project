@@ -1,0 +1,117 @@
+version: '3.8'
+
+# Configuración común
+x-cassandra-environment: &cassandra_environment
+  CASSANDRA_CLUSTER_NAME: ClusterProyecto
+  CASSANDRA_SEEDS: "nodo1"
+  CASSANDRA_DC: DC1
+  CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
+  # --- MEMORIA: 512MB (Ligero y estable) ---
+  MAX_HEAP_SIZE: 512M
+  # HEAP_NEWSIZE eliminado para evitar conflictos
+
+x-healthcheck-def: &healthcheck_def
+  test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
+  interval: 20s
+  timeout: 10s
+  retries: 10
+  start_period: 60s
+
+services:
+  # --- NODO 1 ---
+  nodo1:
+    image: cassandra:latest
+    container_name: nodo1
+    hostname: nodo1
+    ports:
+      - "9042:9042"
+    environment:
+      <<: *cassandra_environment
+    networks:
+      - red-bd-distribuida
+    healthcheck: *healthcheck_def
+    volumes:
+      - cassandra_data_1:/var/lib/cassandra  # <--- ESTO EVITA QUE SE BORRE
+
+  # --- NODO 2 ---
+  nodo2:
+    image: cassandra:latest
+    container_name: nodo2
+    hostname: nodo2
+    ports:
+      - "9043:9042"
+    environment:
+      <<: *cassandra_environment
+    networks:
+      - red-bd-distribuida
+    healthcheck: *healthcheck_def
+    depends_on:
+      nodo1:
+        condition: service_healthy
+    volumes:
+      - cassandra_data_2:/var/lib/cassandra
+
+  # --- NODO 3 ---
+  nodo3:
+    image: cassandra:latest
+    container_name: nodo3
+    hostname: nodo3
+    ports:
+      - "9044:9042"
+    environment:
+      <<: *cassandra_environment
+    networks:
+      - red-bd-distribuida
+    healthcheck: *healthcheck_def
+    depends_on:
+      nodo2:
+        condition: service_healthy
+    volumes:
+      - cassandra_data_3:/var/lib/cassandra
+
+  # --- NODO 4 ---
+  nodo4:
+    image: cassandra:latest
+    container_name: nodo4
+    hostname: nodo4
+    ports:
+      - "9045:9042"
+    environment:
+      <<: *cassandra_environment
+    networks:
+      - red-bd-distribuida
+    healthcheck: *healthcheck_def
+    depends_on:
+      nodo3:
+        condition: service_healthy
+    volumes:
+      - cassandra_data_4:/var/lib/cassandra
+
+  # --- NODO 5 ---
+  nodo5:
+    image: cassandra:latest
+    container_name: nodo5
+    hostname: nodo5
+    ports:
+      - "9046:9042"
+    environment:
+      <<: *cassandra_environment
+    networks:
+      - red-bd-distribuida
+    depends_on:
+      nodo4:
+        condition: service_healthy
+    volumes:
+      - cassandra_data_5:/var/lib/cassandra
+
+networks:
+  red-bd-distribuida:
+    driver: bridge
+
+# VOLÚMENES
+volumes:
+  cassandra_data_1:
+  cassandra_data_2:
+  cassandra_data_3:
+  cassandra_data_4:
+  cassandra_data_5:

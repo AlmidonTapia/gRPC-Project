@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package ventas;
+
+service VentaService {
+  rpc RegistrarVenta (VentaRequest) returns (VentaResponse);
+  rpc ListarVentas (Empty) returns (ListaVentasResponse);
+  rpc ObtenerEstadoNodos (Empty) returns (EstadoNodosResponse);
+}
+
+message Empty {}
+
+message VentaRequest {
+  string producto = 1;
+  float precio = 2;
+  string region = 3;
+  string pais = 4;
+}
+
+message VentaResponse {
+  bool exito = 1;
+  string mensaje = 2;
+  string id_generado = 3;
+}
+
+message VentaDetalle {
+  string id_venta = 1;
+  string producto = 2;
+  float precio = 3;
+  string region = 4;
+  string pais = 5;
+  string fecha = 6;
+}
+
+message ListaVentasResponse {
+  repeated VentaDetalle ventas = 1;
+}
+
+message NodoInfo {
+  string nombre = 1;
+  string estado = 2;
+  string direccion = 3;
+}
+
+message EstadoNodosResponse {
+  repeated NodoInfo nodos = 1;
+}
