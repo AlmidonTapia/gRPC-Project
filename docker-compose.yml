@@ -1,14 +1,11 @@
 version: '3.8'
 
-# Configuración común
 x-cassandra-environment: &cassandra_environment
   CASSANDRA_CLUSTER_NAME: ClusterProyecto
   CASSANDRA_SEEDS: "nodo1"
   CASSANDRA_DC: DC1
   CASSANDRA_ENDPOINT_SNITCH: GossipingPropertyFileSnitch
-  # --- MEMORIA: 512MB (Ligero y estable) ---
   MAX_HEAP_SIZE: 512M
-  # HEAP_NEWSIZE eliminado para evitar conflictos
 
 x-healthcheck-def: &healthcheck_def
   test: ["CMD", "cqlsh", "-e", "describe keyspaces"]
@@ -18,7 +15,6 @@ x-healthcheck-def: &healthcheck_def
   start_period: 60s
 
 services:
-  # --- NODO 1 ---
   nodo1:
     image: cassandra:latest
     container_name: nodo1
@@ -28,12 +24,12 @@ services:
     environment:
       <<: *cassandra_environment
     networks:
-      - red-bd-distribuida
+      red-bd-distribuida:
+        ipv4_address: 172.25.0.2
     healthcheck: *healthcheck_def
     volumes:
-      - cassandra_data_1:/var/lib/cassandra  # <--- ESTO EVITA QUE SE BORRE
+      - cassandra_data_1:/var/lib/cassandra
 
-  # --- NODO 2 ---
   nodo2:
     image: cassandra:latest
     container_name: nodo2
@@ -43,7 +39,8 @@ services:
     environment:
       <<: *cassandra_environment
     networks:
-      - red-bd-distribuida
+      red-bd-distribuida:
+        ipv4_address: 172.25.0.3
     healthcheck: *healthcheck_def
     depends_on:
       nodo1:
@@ -51,7 +48,6 @@ services:
     volumes:
       - cassandra_data_2:/var/lib/cassandra
 
-  # --- NODO 3 ---
   nodo3:
     image: cassandra:latest
     container_name: nodo3
@@ -61,7 +57,8 @@ services:
     environment:
       <<: *cassandra_environment
     networks:
-      - red-bd-distribuida
+      red-bd-distribuida:
+        ipv4_address: 172.25.0.4
     healthcheck: *healthcheck_def
     depends_on:
       nodo2:
@@ -69,7 +66,6 @@ services:
     volumes:
       - cassandra_data_3:/var/lib/cassandra
 
-  # --- NODO 4 ---
   nodo4:
     image: cassandra:latest
     container_name: nodo4
@@ -79,7 +75,8 @@ services:
     environment:
       <<: *cassandra_environment
     networks:
-      - red-bd-distribuida
+      red-bd-distribuida:
+        ipv4_address: 172.25.0.5
     healthcheck: *healthcheck_def
     depends_on:
       nodo3:
@@ -87,7 +84,6 @@ services:
     volumes:
       - cassandra_data_4:/var/lib/cassandra
 
-  # --- NODO 5 ---
   nodo5:
     image: cassandra:latest
     container_name: nodo5
@@ -97,7 +93,8 @@ services:
     environment:
       <<: *cassandra_environment
     networks:
-      - red-bd-distribuida
+      red-bd-distribuida:
+        ipv4_address: 172.25.0.6
     depends_on:
       nodo4:
         condition: service_healthy
@@ -107,8 +104,10 @@ services:
 networks:
   red-bd-distribuida:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
 
-# VOLÚMENES
 volumes:
   cassandra_data_1:
   cassandra_data_2:

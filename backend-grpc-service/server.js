@@ -3,7 +3,6 @@ const protoLoader = require("@grpc/proto-loader");
 const cassandra = require("cassandra-driver");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const net = require("net");
 
 const PROTO_PATH = path.join(__dirname, "proto", "venta.proto");
 const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
@@ -15,25 +14,46 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 const ventaProto = grpc.loadPackageDefinition(packageDefinition).ventas;
 
-const contactPoints = [
-  "127.0.0.1:9042",
-  "127.0.0.1:9043",
-  "127.0.0.1:9044",
-  "127.0.0.1:9045",
-  "127.0.0.1:9046",
-];
+// Usar nombres de host en lugar de IPs para Docker
+const contactPoints = ["nodo1", "nodo2", "nodo3", "nodo4", "nodo5"];
 
 const client = new cassandra.Client({
   contactPoints: contactPoints,
   localDataCenter: "DC1",
   keyspace: "proyecto",
-  socketOptions: { connectTimeout: 10000, readTimeout: 10000 },
-  policies: {
-    loadBalancing: new cassandra.policies.loadBalancing.WhiteListPolicy(
-      new cassandra.policies.loadBalancing.RoundRobinPolicy(),
-      contactPoints
-    ),
+  socketOptions: {
+    connectTimeout: 5000,
+    readTimeout: 5000,
   },
+  pooling: {
+    heartBeatInterval: 1000, // Verificar cada 1 segundo
+    coreConnectionsPerHost: {
+      [cassandra.types.distance.local]: 1,
+      [cassandra.types.distance.remote]: 1,
+    },
+  },
+  policies: {
+    reconnection:
+      new cassandra.policies.reconnection.ConstantReconnectionPolicy(1000),
+    loadBalancing: new cassandra.policies.loadBalancing.RoundRobinPolicy(),
+  },
+});
+
+// Escuchar eventos del driver para debugging
+client.on("hostAdd", (host) => {
+  console.log(`✅ Nodo agregado: ${host.address}`);
+});
+
+client.on("hostRemove", (host) => {
+  console.log(`❌ Nodo removido: ${host.address}`);
+});
+
+client.on("hostUp", (host) => {
+  console.log(`🟢 Nodo UP: ${host.address}`);
+});
+
+client.on("hostDown", (host) => {
+  console.log(`🔴 Nodo DOWN: ${host.address}`);
 });
 
 async function registrarVenta(call, callback) {
@@ -75,60 +95,65 @@ async function listarVentas(call, callback) {
   }
 }
 
-// Verificar conectividad TCP real a un host:puerto
-function verificarConexionTCP(host, puerto) {
+// FUNCIÓN MEJORADA: Verificar estado real con timeout
+async function verificarNodoActivo(host) {
   return new Promise((resolve) => {
-    const socket = net.createConnection({ host, port: puerto, timeout: 1500 });
-    socket.on("connect", () => {
-      socket.destroy();
-      resolve(true);
+    const timeout = setTimeout(() => {
+      resolve(false); // Si tarda más de 2s, considerarlo DOWN
+    }, 2000);
+
+    // Intentar query simple para verificar
+    const testClient = new cassandra.Client({
+      contactPoints: [host],
+      localDataCenter: "DC1",
+      keyspace: "system",
+      socketOptions: { connectTimeout: 1500, readTimeout: 1500 },
     });
-    socket.on("error", () => resolve(false));
-    socket.on("timeout", () => {
-      socket.destroy();
-      resolve(false);
-    });
+
+    testClient
+      .execute("SELECT * FROM system.local LIMIT 1")
+      .then(() => {
+        clearTimeout(timeout);
+        testClient.shutdown();
+        resolve(true);
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        testClient.shutdown();
+        resolve(false);
+      });
   });
 }
 
 async function obtenerEstadoNodos(call, callback) {
   let hosts = Array.from(client.hosts.values());
 
-  // Ordenar por dirección
-  hosts.sort((a, b) => {
-    const ipA = a.address.toString();
-    const ipB = b.address.toString();
-    return ipA.localeCompare(ipB);
-  });
+  // Mapear a nombres conocidos
+  const nodosBase = [
+    { nombre: "Nodo 1", host: "nodo1", puerto: "9042" },
+    { nombre: "Nodo 2", host: "nodo2", puerto: "9043" },
+    { nombre: "Nodo 3", host: "nodo3", puerto: "9044" },
+    { nombre: "Nodo 4", host: "nodo4", puerto: "9045" },
+    { nombre: "Nodo 5", host: "nodo5", puerto: "9046" },
+  ];
 
-  // Verificar conectividad TCP real con cada nodo
-  const verificaciones = hosts.map(async (host) => {
-    const direccion = host.address.toString();
-    const [ip, puerto] = direccion.split(":");
-    const conectado = await verificarConexionTCP(ip, parseInt(puerto) || 9042);
+  // Verificar estado real de cada nodo
+  const estadoPromises = nodosBase.map(async (nodo) => {
+    const estaActivo = await verificarNodoActivo(nodo.host);
+    const estado = estaActivo ? "UP" : "DOWN";
+
     console.log(
-      `Verificando [${direccion}] -> ${
-        conectado ? "CONECTADO" : "NO CONECTADO"
-      }`
+      `🔍 Monitor: ${nodo.nombre} [${nodo.host}:${nodo.puerto}] -> ${estado}`
     );
+
     return {
-      direccion: direccion,
-      estado: conectado ? "UP" : "DOWN",
+      nombre: nodo.nombre,
+      estado: estado,
+      direccion: `${nodo.host}:${nodo.puerto}`,
     };
   });
 
-  const resultados = await Promise.all(verificaciones);
-
-  // Filtrar solo nodos que realmente están UP
-  const nodosActivos = resultados.filter((n) => n.estado === "UP");
-
-  const estadoNodos = nodosActivos.map((nodo, index) => {
-    const nombre = `Nodo ${index + 1}`;
-    console.log(`Monitor: ${nombre} [${nodo.direccion}] -> ${nodo.estado}`);
-    return { nombre, estado: nodo.estado, direccion: nodo.direccion };
-  });
-
-  console.log(`Total nodos UP: ${estadoNodos.length}`);
+  const estadoNodos = await Promise.all(estadoPromises);
   callback(null, { nodos: estadoNodos });
 }
 
@@ -147,7 +172,7 @@ function main() {
       client
         .connect()
         .then(() => console.log("✅ Conectado a Cassandra"))
-        .catch((e) => console.error(e));
+        .catch((e) => console.error("❌ Error conectando:", e));
     }
   );
 }

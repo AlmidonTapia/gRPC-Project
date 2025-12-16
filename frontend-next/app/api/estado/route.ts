@@ -28,7 +28,7 @@ export async function GET() {
                 }
             });
         });
-    } catch (error: unknown) {
+    } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return Response.json({ nodos: [], error: message }, { status: 500 });
     }
