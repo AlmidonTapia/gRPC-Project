@@ -105,7 +105,6 @@ services:
       - cassandra_data_5:/var/lib/cassandra
 
   # --- SERVICIO DE AUTOMATIZACIÓN (INIT) ---
-  # Este servicio levanta, crea la BD y se apaga solo.
   cassandra-init:
     image: cassandra:latest
     container_name: cassandra-init

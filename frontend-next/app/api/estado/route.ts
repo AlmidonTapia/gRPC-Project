@@ -37,7 +37,6 @@ export async function GET() {
             grpcClient.ObtenerEstadoNodos({}, (err: any, response: any) => {
                 if (err) {
                     console.error("Error gRPC Estado:", err);
-                    // Retornamos array vacío para no romper el front
                     resolve(NextResponse.json({ nodos: [] }));
                 } else {
                     resolve(NextResponse.json({ nodos: response.nodos || [] }));

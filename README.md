@@ -1,270 +1,145 @@
-# gRPC Cassandra Distributed System
+# Documentación del Sistema de Ventas Distribuido
 
-Sistema distribuido con Cassandra, gRPC y Next.js para gestionar ventas en tiempo real con monitoreo de nodos del cluster.
+## 1. Visión General del Proyecto
+Este proyecto simula un sistema de alta disponibilidad para el registro y monitoreo de ventas. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona.
 
-## Estructura del Proyecto
+### Tecnologías Principales
+* **Frontend:** Next.js 14 (React) con Tailwind CSS **[Ejecución Local]**.
+* **Backend:** Node.js puro implementando el protocolo **gRPC** **[Ejecución Local]**.
+* **Base de Datos:** Cluster de **Apache Cassandra** (5 Nodos) con replicación.
+* **Infraestructura:** Docker & Docker Compose (Solo para la capa de datos).
 
-```
-├── backend-grpc-service/      # Servidor gRPC con Node.js
-│   ├── server.js              # Servidor principal
-│   ├── package.json
-│   └── proto/
-│       └── venta.proto        # Definición de servicios gRPC
-│
-├── frontend-next/             # Frontend con Next.js
-│   ├── app/
-│   │   ├── page.tsx          # Página principal (monitoreo + formulario)
-│   │   ├── api/
-│   │   │   ├── estado/       # API para estado de nodos
-│   │   │   └── venta/        # API para gestión de ventas
-│   │   └── globals.css
-│   ├── package.json
-│   └── tsconfig.json
-│
-└── docker-compose.yml         # Orquestación de 5 nodos Cassandra
-```
+---
 
-## Requisitos
+## 2. Arquitectura del Sistema
 
-- **Node.js** v20+
-- **Docker** y **Docker Compose**
-- **npm** o **yarn**
+El flujo de datos atraviesa el entorno local y el entorno virtualizado:
 
-## Instalación
+1. **Cliente (Navegador):** Interactúa con la interfaz en `localhost:3000`.
+2. **API Gateway (Next.js):** Recibe HTTP y conecta al Backend local vía gRPC (`localhost:50051`).
+3. **Backend gRPC:** Procesa la lógica y se conecta al Cluster Cassandra mediante los puertos expuestos en el host (`localhost:9042` a `9046`).
+4. **Cassandra Cluster (Docker):** Los contenedores reciben la data a través del mapeo de puertos y replican la información internamente en la red de Docker.
+---
 
-### 1. Clonar el repositorio
+## 3. Infraestructura (Docker & Cassandra)
 
-```bash
-git clone https://github.com/tu-usuario/gRPC-Project.git
-cd gRPC-Project
-```
+La infraestructura se define en `docker-compose.yml`. El cluster está diseñado para ser autónomo y autorreparable.
 
-### 2. Iniciar los contenedores Cassandra
+### Componentes Clave:
+* **Red Personalizada (`red-bd-distribuida`):** Usamos una subred con IPs estáticas (`172.25.0.0/16`) para evitar problemas de descubrimiento (gossip) entre nodos cuando se reinician.
+* **Nodos de Cassandra (5 Contenedores):**
+    * Cada nodo expone su puerto interno `9042` a un puerto distinto en tu PC (`9042`, `9043`, `9044`, `9045`, `9046`).
+    * **Objetivo:** Permitir que el Backend (que corre fuera de Docker) pueda conectarse a cualquiera de los nodos.
+* **Inicializador Automático (`cassandra-init`):**
+    * Es un contenedor efímero.
+    * **Lógica:** Espera a que exista un **Quorum** (Nodo 1 y Nodo 2 saludables) para asegurar consistencia.
+    * **Acción:** Ejecuta el script `init.cql` que crea el *Keyspace* y la *Tabla* automáticamente. Luego se apaga.
 
-```bash
-docker-compose up -d
-```
+---
 
-Espera a que los nodos se inicien (aprox. 30-60 segundos):
+## 4. Backend (Lógica y Comunicación)
 
-```bash
-docker ps
-```
+El cerebro del sistema, ubicado en `/backend-grpc-service`. Se ejecuta como un proceso de Node.js en tu máquina.
 
-### 3. Configurar el Backend
+### Protocolo gRPC (`venta.proto`)
+Define el contrato estricto de comunicación.
+* **Servicios:** `RegistrarVenta`, `ListarVentas`, `ObtenerEstadoNodos`.
+* **Mensajes:** Estructuras tipadas (string, float) que incluyen los nuevos datos del cliente (`cliente_nombre`, `cliente_dni_ruc`, etc.).
 
-```bash
-cd backend-grpc-service
-npm install
-node server.js
-```
+### Servidor (`server.js`)
+* **Conexión a BD:** Utiliza `cassandra-driver` con políticas de balanceo de carga (*RoundRobin*) y lista blanca de IPs.
+* **Healthcheck TCP:** Implementa una función personalizada utilizando `net.Socket` para verificar si los puertos `9042` de los nodos están abiertos, permitiendo al frontend saber qué nodos están "UP" o "DOWN" en tiempo real.
+* **Lógica de Negocio:**
+    * Genera UUIDs únicos para cada venta.
+    * Inserta datos con consistencia `LOCAL_ONE` (prioriza velocidad).
+    * Transforma los resultados de Cassandra a objetos JSON limpios.
 
-El servidor gRPC estará disponible en **localhost:50051**
+---
 
-### 4. Configurar el Frontend
+## 5. Frontend (Interfaz y Sincronización)
 
-En otra terminal:
+La cara del sistema, ubicada en /frontend-next. Se ejecuta como un servidor de desarrollo Next.js en tu máquina.
 
-```bash
-cd frontend-next
-npm install
-npm run dev
-```
+### Interfaz de Usuario (`page.tsx`)
+* **Diseño:** Dashboard moderno con indicadores de estado en tiempo real.
+* **Gestión de Estado:** Usa `useState` para manejar el formulario, la lista de ventas y el estado de los nodos.
+* **Polling (Sincronización):**
+    * `setInterval` cada **2 segundos**: Consulta la salud de los servidores.
+    * `setInterval` cada **5 segundos**: Actualiza la tabla de ventas.
+    * Esto simula una experiencia "tiempo real" sin la complejidad de WebSockets.
 
-El frontend estará disponible en **http://localhost:3000**
+### API Routes (`api/venta/route.ts` y `api/estado/route.ts`)
+Next.js actúa como intermediario. El navegador no puede hablar gRPC directamente, por lo que estas rutas:
+1.  Reciben JSON del `fetch` del cliente.
+2.  **Patrón Singleton:** Mantienen una única conexión gRPC abierta (reutilizando el cliente) para no saturar el servidor.
+3.  Convierten los tipos de datos (ej. `precio` de String a Float).
+4.  Envían la petición al contenedor `backend` y devuelven la respuesta.
 
-## Funcionalidades
+---
 
-### Backend (gRPC)
+## 6. Base de Datos (Modelo de Datos)
 
-- **RegistrarVenta**: Inserta ventas en Cassandra
-- **ListarVentas**: Obtiene todas las ventas registradas
-- **ObtenerEstadoNodos**: Monitorea el estado en tiempo real de los 5 nodos
-
-### Frontend (Next.js)
-
-- 📊 **Monitoreo en Tiempo Real**: Visualización del estado de nodos (UP/DOWN)
-- 📝 **Formulario de Registro**: Registra ventas con producto, precio, país y región
-- 📋 **Tabla de Historial**: Muestra todas las ventas con filtros por región
-- 🔄 **Polling Automático**: Actualiza el estado cada 2 segundos
-
-## Estructura de Datos (Cassandra)
-
-### Tabla `ventas`
+El esquema CQL está optimizado para lecturas rápidas ordenadas por fecha.
 
 ```sql
 CREATE TABLE ventas (
-  id_venta UUID PRIMARY KEY,
-  region TEXT,
-  pais TEXT,
-  producto TEXT,
-  precio FLOAT,
-  fecha TIMESTAMP
-);
+    region text,           -- Partition Key (Agrupa datos por zona física)
+    fecha timestamp,       -- Clustering Key (Ordena descendentemente)
+    id_venta uuid,         -- Clustering Key (Asegura unicidad)
+    pais text,
+    producto text,
+    precio float,
+    cliente_nombre text,
+    cliente_apellido text,
+    cliente_dni_ruc text,
+    PRIMARY KEY ((region), fecha, id_venta)
+) WITH CLUSTERING ORDER BY (fecha DESC, id_venta ASC);
 ```
+### Detalles de la Clave Primaria:
+*   **Partition Key (`region`):** Permite que el cluster distribuya la carga. Las ventas de diferentes regiones pueden vivir en nodos distintos, optimizando el almacenamiento físico.
+*   **Clustering Key (`fecha DESC`):** Optimiza el dashboard, devolviendo automáticamente las ventas más recientes sin costo computacional adicional en la consulta (evita el uso de `ORDER BY` en tiempo de ejecución).
 
-## Docker Compose
+---
 
-El archivo `docker-compose.yml` orquesta:
+## 7. Cómo Ejecutar el Proyecto
 
-- **5 nodos Cassandra** en red distribuida
-- **Red personalizada** `red-bd-distribuida`
-- **Health checks** para verificar disponibilidad
-- **Volúmenes persistentes** para datos
+Al no estar todo dockerizado, necesitas levantar los servicios en 3 terminales distintas.
 
-### Puertos
+### Requisitos Previos
+*   Tener instalado [Docker Desktop](www.docker.com).
+*   Contar con la estructura de carpetas: `/frontend`, `/backend`, `/proto`, y `/scripts`.
 
-| Nodo  | Puerto | Contenedor       |
-| ----- | ------ | ---------------- |
-| nodo1 | 9042   | cassandra:latest |
-| nodo2 | 9043   | cassandra:latest |
-| nodo3 | 9044   | cassandra:latest |
-| nodo4 | 9045   | cassandra:latest |
-| nodo5 | 9046   | cassandra:latest |
+### Paso 1: Levantar la Base de Datos
+1.  Abre una terminal en la raíz del proyecto.
+2.  Ejecuta el siguiente comando para construir y levantar los contenedores:
+    ```bash
+    docker-compose up -d
+    ```
+**Verificación:** Espera a que el contenedor cassandra-init termine su trabajo (verás "Inicialización COMPLETADA" en los logs o usando docker logs cassandra-init).
 
-## Uso
+### Paso 2: Iniciar el Backend (Local)
+1. Abre otra terminal y navega hacia la ruta del backend.
+    ```bash
+    cd backend-grpc-service
+    ```
+2.  Ejecuta el siguiente comando para instalar todas las dependencias y e inicar el servidor
+    ```bash
+    npm install
+    node server.js
+    ```
 
-### Registrar una venta
+> **Verificación** Deberías ver: 🚀 Backend gRPC corriendo y ✅ Conexión a Cassandra EXITOSA.
 
-```bash
-curl -X POST http://localhost:3000/api/venta \
-  -H "Content-Type: application/json" \
-  -d '{"producto": "Laptop", "precio": 999.99, "pais": "Peru", "region": "SUR"}'
-```
+### Paso 3: 
+1. Abre otra terminal y navega hacia la ruta del frontend.
+    ```bash
+    cd frontend-next
+    ```
+2.  Ejecuta el siguiente comando para instalar todas las dependencias y e inicar el servidor
+    ```bash
+    npm install
+    npm run dev
+    ```
+> **Verificación** Una vez finalizado el proceso, puedes ingresar al sistema desde tu navegador en: [http://localhost:3000](http://localhost:3000).
 
-### Obtener estado de nodos
-
-```bash
-curl http://localhost:3000/api/estado
-```
-
-### Listar todas las ventas
-
-```bash
-curl http://localhost:3000/api/venta
-```
-
-## Monitoreo
-
-### Ver logs del backend
-
-```bash
-# En la terminal donde corre server.js
-# Verás: Monitor: Nodo X [IP:PUERTO] -> UP/DOWN
-```
-
-### Ver estado del cluster Cassandra
-
-```bash
-docker exec -it nodo1 nodetool status
-```
-
-### Pausar/Reanudar nodos (Pruebas)
-
-```bash
-# Pausar un nodo
-docker pause nodo2
-
-# Reanudar un nodo
-docker unpause nodo2
-```
-
-## API Endpoints
-
-### Frontend API Routes
-
-#### `GET /api/estado`
-
-Retorna estado de todos los nodos UP
-
-**Response:**
-
-```json
-{
-  "nodos": [
-    {
-      "nombre": "Nodo 1",
-      "estado": "UP",
-      "direccion": "172.18.0.2:9042"
-    }
-  ]
-}
-```
-
-#### `GET /api/venta`
-
-Lista todas las ventas
-
-**Response:**
-
-```json
-{
-  "ventas": [
-    {
-      "id_venta": "uuid",
-      "producto": "Laptop",
-      "precio": 999.99,
-      "region": "SUR",
-      "pais": "Peru",
-      "fecha": "2025-12-05T10:30:00Z"
-    }
-  ]
-}
-```
-
-#### `POST /api/venta`
-
-Registra una nueva venta
-
-**Body:**
-
-```json
-{
-  "producto": "Laptop",
-  "precio": 999.99,
-  "pais": "Peru",
-  "region": "SUR"
-}
-```
-
-## Solución de Problemas
-
-### Error: "illegal token '¿syntax'" en proto
-
-Asegúrate de que el archivo `venta.proto` esté en UTF-8 sin BOM:
-
-```powershell
-# PowerShell
-$path = 'backend-grpc-service/proto/venta.proto'
-$txt = Get-Content -Raw $path
-[System.IO.File]::WriteAllText($path, $txt, (New-Object System.Text.UTF8Encoding $false))
-```
-
-### Los nodos no aparecen en el frontend
-
-- Verifica que Docker esté corriendo: `docker ps`
-- Revisa los logs del backend: `node server.js`
-- Confirma conectividad: `docker exec -it nodo1 nodetool status`
-
-### Timeout de conexión a Cassandra
-
-Aumenta el tiempo de espera en `backend-grpc-service/server.js`:
-
-```javascript
-socketOptions: { connectTimeout: 15000, readTimeout: 15000 }
-```
-
-## Tecnologías
-
-- **Backend**: Node.js, gRPC, Cassandra Driver
-- **Frontend**: Next.js, TypeScript, Tailwind CSS
-- **Infraestructura**: Docker, Docker Compose
-- **Base de Datos**: Apache Cassandra
-
-## Licencia
-
-MIT
-
-## Autor
-
-Saul - Proyecto Base de Datos Distribuidos 2025
+* **⚠️NOTA** El orden es importante. Cassandra debe estar lista antes de iniciar el Backend, y el Backend debe estar listo antes de usar el Frontend.

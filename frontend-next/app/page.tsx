@@ -9,7 +9,6 @@ interface Venta {
   region: string;
   pais: string;
   fecha: string;
-  // Nuevos campos opcionales (vienen del gRPC)
   cliente_nombre?: string;
   cliente_apellido?: string;
   cliente_dni_ruc?: string;
@@ -26,7 +25,6 @@ interface FormState {
   precio: string | number;
   pais: string;
   region: string;
-  // Nuevos campos del formulario
   cliente_nombre: string;
   cliente_apellido: string;
   cliente_dni_ruc: string;
@@ -76,7 +74,6 @@ export default function Home() {
 
   // --- EFECTOS ---
   useEffect(() => {
-    // Función para obtener estado
     const fetchEstado = async () => {
       try {
         const res = await fetch('/api/estado');
