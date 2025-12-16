@@ -109,6 +109,15 @@ export default function Home() {
     const intervalVentas = setInterval(cargarVentas, 5000);
     return () => clearInterval(intervalVentas);
   }, []);
+  
+  useEffect(() => {
+    if (mensaje) {
+      const timer = setTimeout(() => {
+        setMensaje(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [mensaje]);
 
   // envio del form
   const handleSubmit = async (e: FormEvent) => {
@@ -242,39 +251,40 @@ export default function Home() {
                     <form onSubmit={handleSubmit} className="p-6 space-y-5">
                         
                         {/* --- SECCION CLIENTE --- */}
-                        <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3">
-                             <div className="flex items-center gap-2 mb-1">
-                                <div className="p-1 bg-indigo-100 rounded text-indigo-600">
-                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        <div className="space-y-4">                      
+                            <div className="space-y-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase ml-1">DNI O RUC Cliente</label>
+                                <input 
+                                    type="text" 
+                                    value={form.cliente_dni_ruc} 
+                                    onChange={e => setForm({...form, cliente_dni_ruc: e.target.value})}
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700 placeholder:text-slate-400" 
+                                    placeholder="Ej: 77123456" 
+                                    required
+                                />
+                            </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1">Nombres</label>
+                                    <input 
+                                        type="text" 
+                                        value={form.cliente_nombre} 
+                                        onChange={e => setForm({...form, cliente_nombre: e.target.value})}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700 placeholder:text-slate-400" 
+                                        placeholder="Ej: Juan" 
+                                    />
                                 </div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Datos del Cliente</label>
-                             </div>
-                             
-                             <input 
-                                type="text" 
-                                value={form.cliente_dni_ruc} 
-                                onChange={e => setForm({...form, cliente_dni_ruc: e.target.value})}
-                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
-                                placeholder="DNI o RUC (Requerido)" 
-                                required
-                             />
-                             
-                             <div className="grid grid-cols-2 gap-2">
-                                <input 
-                                    type="text" 
-                                    value={form.cliente_nombre} 
-                                    onChange={e => setForm({...form, cliente_nombre: e.target.value})}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
-                                    placeholder="Nombres" 
-                                />
-                                <input 
-                                    type="text" 
-                                    value={form.cliente_apellido} 
-                                    onChange={e => setForm({...form, cliente_apellido: e.target.value})}
-                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
-                                    placeholder="Apellidos" 
-                                />
-                             </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1">Apellidos</label>
+                                    <input 
+                                        type="text" 
+                                        value={form.cliente_apellido} 
+                                        onChange={e => setForm({...form, cliente_apellido: e.target.value})}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700 placeholder:text-slate-400" 
+                                        placeholder="Ej: Pérez" 
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         {/* --- SECCION PRODUCTO --- */}
