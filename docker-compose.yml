@@ -1,5 +1,6 @@
 version: '3.8'
 
+# --- DEFINICIONES REUTILIZABLES ---
 x-cassandra-environment: &cassandra_environment
   CASSANDRA_CLUSTER_NAME: ClusterProyecto
   CASSANDRA_SEEDS: "nodo1"
@@ -15,6 +16,7 @@ x-healthcheck-def: &healthcheck_def
   start_period: 60s
 
 services:
+  # --- NODO SEED (PRINCIPAL) ---
   nodo1:
     image: cassandra:latest
     container_name: nodo1
@@ -30,6 +32,7 @@ services:
     volumes:
       - cassandra_data_1:/var/lib/cassandra
 
+  # --- NODOS WORKERS ---
   nodo2:
     image: cassandra:latest
     container_name: nodo2
@@ -100,6 +103,31 @@ services:
         condition: service_healthy
     volumes:
       - cassandra_data_5:/var/lib/cassandra
+
+  # --- SERVICIO DE AUTOMATIZACIÓN (INIT) ---
+  # Este servicio levanta, crea la BD y se apaga solo.
+  cassandra-init:
+    image: cassandra:latest
+    container_name: cassandra-init
+    depends_on:
+      nodo1:
+        condition: service_healthy
+    volumes:
+      - ./scripts/init.cql:/init.cql
+    networks:
+      - red-bd-distribuida
+    command: >
+      bash -c "
+      echo '⏳ Iniciando script de configuración...' &&
+      echo '⏳ Esperando conexión estable con nodo1...' &&
+      until cqlsh nodo1 9042 -e 'describe cluster' > /dev/null 2>&1; do
+        echo '💤 Cassandra aun no responde. Reintentando en 5 segundos...'
+        sleep 5
+      done &&
+      echo '✅ Conexión exitosa! Ejecutando init.cql...' &&
+      cqlsh nodo1 9042 -f /init.cql &&
+      echo '🚀 Inicialización COMPLETADA. Keyspace y Tablas creadas.'
+      "
 
 networks:
   red-bd-distribuida:
