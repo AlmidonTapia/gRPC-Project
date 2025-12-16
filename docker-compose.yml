@@ -112,21 +112,19 @@ services:
     depends_on:
       nodo1:
         condition: service_healthy
+      nodo2:
+        condition: service_healthy
     volumes:
       - ./scripts/init.cql:/init.cql
     networks:
       - red-bd-distribuida
     command: >
       bash -c "
-      echo '⏳ Iniciando script de configuración...' &&
-      echo '⏳ Esperando conexión estable con nodo1...' &&
-      until cqlsh nodo1 9042 -e 'describe cluster' > /dev/null 2>&1; do
-        echo '💤 Cassandra aun no responde. Reintentando en 5 segundos...'
-        sleep 5
-      done &&
-      echo '✅ Conexión exitosa! Ejecutando init.cql...' &&
+      echo '⏳ Esperando a que el cluster se estabilice (Nodos 1 y 2)...' &&
+      sleep 10 && 
+      echo '✅ Nodos listos. Ejecutando init.cql...' &&
       cqlsh nodo1 9042 -f /init.cql &&
-      echo '🚀 Inicialización COMPLETADA. Keyspace y Tablas creadas.'
+      echo '🚀 Inicialización COMPLETADA.'
       "
 
 networks:
