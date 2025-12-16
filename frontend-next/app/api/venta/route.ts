@@ -15,7 +15,6 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 
 const ventaProto = grpc.loadPackageDefinition(packageDefinition).ventas as any;
 
-// Cliente gRPC Singleton
 let client: any = null;
 
 function getClient() {
@@ -28,35 +27,40 @@ function getClient() {
     return client;
 }
 
-// 1. GET: Obtener historial de ventas
+// 1. GET: Obtener historial
 export async function GET() {
     const clienteGrpc = getClient();
-    
+
     return new Promise((resolve) => {
         clienteGrpc.ListarVentas({}, (err: any, response: any) => {
             if (err) {
                 console.error("Error gRPC Listar:", err);
                 resolve(NextResponse.json({ ventas: [] }));
             } else {
-                resolve(NextResponse.json(response));
+                resolve(NextResponse.json({ ventas: response.ventas || [] }));
             }
         });
     });
 }
 
-// 2. POST: Registrar nueva venta
+// 2. POST: Registrar venta
 export async function POST(request: NextRequest) {
     const clienteGrpc = getClient();
     const body = await request.json();
 
+    const datosVenta = {
+        ...body,
+        precio: parseFloat(body.precio)
+    };
+
     return new Promise((resolve) => {
-        clienteGrpc.RegistrarVenta(body, (err: any, response: any) => {
+        clienteGrpc.RegistrarVenta(datosVenta, (err: any, response: any) => {
             if (err) {
                 console.error("Error gRPC Registrar:", err);
-                resolve(NextResponse.json({ 
-                    exito: false, 
-                    mensaje: "Error de conexión gRPC", 
-                    id_generado: "" 
+                resolve(NextResponse.json({
+                    exito: false,
+                    mensaje: "Error de conexión con el servidor gRPC",
+                    id_generado: ""
                 }));
             } else {
                 resolve(NextResponse.json(response));

@@ -9,6 +9,10 @@ interface Venta {
   region: string;
   pais: string;
   fecha: string;
+  // Nuevos campos opcionales (vienen del gRPC)
+  cliente_nombre?: string;
+  cliente_apellido?: string;
+  cliente_dni_ruc?: string;
 }
 
 interface Nodo {
@@ -22,6 +26,10 @@ interface FormState {
   precio: string | number;
   pais: string;
   region: string;
+  // Nuevos campos del formulario
+  cliente_nombre: string;
+  cliente_apellido: string;
+  cliente_dni_ruc: string;
 }
 
 interface MensajeState {
@@ -50,7 +58,16 @@ const SaveIcon = ({ className }: { className?: string }) => (
 
 export default function Home() {
   // --- ESTADOS ---
-  const [form, setForm] = useState<FormState>({ producto: '', precio: '', pais: '', region: 'SUR' });
+  const [form, setForm] = useState<FormState>({ 
+    producto: '', 
+    precio: '', 
+    pais: '', 
+    region: 'SUR',
+    cliente_nombre: '',
+    cliente_apellido: '',
+    cliente_dni_ruc: ''
+  });
+  
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [nodos, setNodos] = useState<Nodo[]>([]);
   const [mensaje, setMensaje] = useState<MensajeState | null>(null);
@@ -72,12 +89,8 @@ export default function Home() {
       }
     };
 
-    // Ejecutar inmediatamente
     fetchEstado();
-
-    // Polling cada 2 segundos
     const interval = setInterval(fetchEstado, 2000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -91,7 +104,6 @@ export default function Home() {
     } catch (error) { console.error("Error cargando ventas"); }
   };
 
-  // Cargar ventas al montar
   useEffect(() => {
     cargarVentas();
     const intervalVentas = setInterval(cargarVentas, 5000);
@@ -104,8 +116,9 @@ export default function Home() {
     setLoading(true);
     setMensaje(null);
 
-    if (!form.producto || !form.precio || !form.pais) {
-        setMensaje({ tipo: 'error', texto: 'Por favor completa todos los campos.' });
+    // Validación básica
+    if (!form.producto || !form.precio || !form.pais || !form.cliente_dni_ruc) {
+        setMensaje({ tipo: 'error', texto: 'Por favor completa los campos obligatorios.' });
         setLoading(false);
         return;
     }
@@ -120,7 +133,15 @@ export default function Home() {
       
       if (data.exito) {
         setMensaje({ tipo: 'success', texto: `¡Venta guardada! ID: ${data.id_generado.substring(0,8)}...` });
-        setForm({ ...form, producto: '', precio: '' }); 
+        // Resetear formulario completo
+        setForm({ 
+            ...form, 
+            producto: '', 
+            precio: '',
+            cliente_nombre: '',
+            cliente_apellido: '',
+            cliente_dni_ruc: ''
+        }); 
         cargarVentas(); 
       } else {
         setMensaje({ tipo: 'error', texto: `Error: ${data.mensaje}` });
@@ -148,7 +169,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 font-sans pb-20">
       
-      {/* --- NAVBAR CON GRADIENTE --- */}
+      {/* --- NAVBAR --- */}
       <div className="bg-gradient-to-r from-indigo-900 via-purple-900 to-slate-900 pb-32">
         <div className="max-w-7xl mx-auto px-6 pt-8 pb-4">
           <div className="flex justify-between items-center">
@@ -204,11 +225,6 @@ export default function Home() {
                     {nodo.estado === 'UP' && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-emerald-500/10 to-transparent rounded-bl-full -mr-4 -mt-4"></div>}
                 </div>
                 ))}
-                {nodos.length === 0 && (
-                    <div className="col-span-5 bg-white/10 backdrop-blur-md rounded-xl p-8 text-center border border-white/20">
-                        <p className="text-sm text-white font-medium animate-pulse">📡 Conectando con el cluster...</p>
-                    </div>
-                )}
             </div>
         </div>
 
@@ -225,46 +241,87 @@ export default function Home() {
                     
                     <form onSubmit={handleSubmit} className="p-6 space-y-5">
                         
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Producto</label>
-                            <input 
+                        {/* --- SECCION CLIENTE --- */}
+                        <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3">
+                             <div className="flex items-center gap-2 mb-1">
+                                <div className="p-1 bg-indigo-100 rounded text-indigo-600">
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                                </div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Datos del Cliente</label>
+                             </div>
+                             
+                             <input 
                                 type="text" 
-                                value={form.producto} 
-                                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700 placeholder:text-slate-400" 
-                                placeholder="Ej: MacBook Pro M3" 
-                                required 
-                                onChange={e => setForm({...form, producto: e.target.value})} 
-                            />
+                                value={form.cliente_dni_ruc} 
+                                onChange={e => setForm({...form, cliente_dni_ruc: e.target.value})}
+                                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
+                                placeholder="DNI o RUC (Requerido)" 
+                                required
+                             />
+                             
+                             <div className="grid grid-cols-2 gap-2">
+                                <input 
+                                    type="text" 
+                                    value={form.cliente_nombre} 
+                                    onChange={e => setForm({...form, cliente_nombre: e.target.value})}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
+                                    placeholder="Nombres" 
+                                />
+                                <input 
+                                    type="text" 
+                                    value={form.cliente_apellido} 
+                                    onChange={e => setForm({...form, cliente_apellido: e.target.value})}
+                                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm placeholder:text-slate-400" 
+                                    placeholder="Apellidos" 
+                                />
+                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* --- SECCION PRODUCTO --- */}
+                        <div className="space-y-4">
                             <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Precio ($)</label>
+                                <label className="text-xs font-bold text-slate-500 uppercase ml-1">Producto</label>
                                 <input 
-                                    type="number" 
-                                    value={form.precio} 
-                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700" 
-                                    placeholder="0.00" 
+                                    type="text" 
+                                    value={form.producto} 
+                                    onChange={e => setForm({...form, producto: e.target.value})}
+                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700 placeholder:text-slate-400" 
+                                    placeholder="Ej: Laptop Gamer" 
                                     required 
-                                    onChange={e => setForm({...form, precio: parseFloat(e.target.value)})} 
                                 />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-xs font-bold text-slate-500 uppercase ml-1">País</label>
-                                <select 
-                                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm cursor-pointer text-slate-700" 
-                                    onChange={e => setForm({...form, pais: e.target.value})}
-                                    value={form.pais}
-                                >
-                                <option value="">Elegir...</option>
-                                <option value="Peru">Perú</option>
-                                <option value="Argentina">Argentina</option>
-                                <option value="Colombia">Colombia</option>
-                                <option value="Mexico">México</option>
-                                </select>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1">Precio ($)</label>
+                                    <input 
+                                        type="number" 
+                                        value={form.precio} 
+                                        onChange={e => setForm({...form, precio: parseFloat(e.target.value)})}
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white outline-none text-sm transition-all text-slate-700" 
+                                        placeholder="0.00" 
+                                        required 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-500 uppercase ml-1">País</label>
+                                    <select 
+                                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none text-sm cursor-pointer text-slate-700" 
+                                        onChange={e => setForm({...form, pais: e.target.value})}
+                                        value={form.pais}
+                                        required
+                                    >
+                                    <option value="">Elegir...</option>
+                                    <option value="Peru">Perú</option>
+                                    <option value="Argentina">Argentina</option>
+                                    <option value="Colombia">Colombia</option>
+                                    <option value="Mexico">México</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
 
+                        {/* --- SECCION REGION --- */}
                         <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-2">
                             <label className="text-xs font-bold text-indigo-700 uppercase flex items-center gap-2">
                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
@@ -338,6 +395,7 @@ export default function Home() {
                         <table className="w-full text-left text-sm">
                             <thead className="bg-slate-50/80 border-b border-slate-100">
                             <tr>
+                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Producto</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Región</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Precio</th>
@@ -346,7 +404,7 @@ export default function Home() {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                             {ventasFiltradas.length === 0 ? (
-                                <tr><td colSpan={4} className="px-6 py-20 text-center">
+                                <tr><td colSpan={5} className="px-6 py-20 text-center">
                                     <div className="flex flex-col items-center justify-center text-slate-300">
                                         <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
                                         <p className="text-sm font-medium">No hay datos registrados en esta vista.</p>
@@ -356,8 +414,21 @@ export default function Home() {
                                 ventasFiltradas.map((v) => (
                                 <tr key={v.id_venta} className="hover:bg-slate-50/80 transition-colors group">
                                     <td className="px-6 py-4">
-                                        <div className="font-bold text-slate-700 group-hover:text-indigo-600 transition-colors">{v.producto}</div>
-                                        <div className="text-[11px] text-slate-400 font-medium uppercase tracking-wide">{v.pais}</div>
+                                        {v.cliente_dni_ruc && (
+                                            <>
+                                                <div className="font-bold text-slate-700 text-xs">
+                                                    {(v.cliente_nombre || '') + ' ' + (v.cliente_apellido || '')}
+                                                </div>
+                                                <div className="text-[10px] text-slate-400 font-mono">
+                                                    ID: {v.cliente_dni_ruc}
+                                                </div>
+                                            </>
+                                        )}
+                                        {!v.cliente_dni_ruc && <span className="text-slate-300 text-xs italic">Anónimo</span>}
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">{v.producto}</div>
+                                        <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{v.pais}</div>
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold ring-1 ring-inset uppercase tracking-wide ${getBadgeColor(v.region)}`}>

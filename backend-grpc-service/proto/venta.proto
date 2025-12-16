@@ -10,11 +10,16 @@ service VentaService {
 
 message Empty {}
 
+
 message VentaRequest {
   string producto = 1;
   float precio = 2;
   string region = 3;
   string pais = 4;
+  // Nuevos campos del cliente
+  string cliente_nombre = 5;
+  string cliente_apellido = 6;
+  string cliente_dni_ruc = 7;
 }
 
 message VentaResponse {
@@ -23,6 +28,7 @@ message VentaResponse {
   string id_generado = 3;
 }
 
+
 message VentaDetalle {
   string id_venta = 1;
   string producto = 2;
@@ -30,6 +36,10 @@ message VentaDetalle {
   string region = 4;
   string pais = 5;
   string fecha = 6;
+  // Nuevos campos del cliente
+  string cliente_nombre = 7;
+  string cliente_apellido = 8;
+  string cliente_dni_ruc = 9;
 }
 
 message ListaVentasResponse {

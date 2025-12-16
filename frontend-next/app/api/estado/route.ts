@@ -1,35 +1,52 @@
-import { credentials } from '@grpc/grpc-js';
+import { credentials, loadPackageDefinition } from '@grpc/grpc-js';
 import protoLoader from '@grpc/proto-loader';
 import path from 'path';
+import { NextResponse } from 'next/server';
 
-export async function GET() {
-    try {
-        const PROTO_PATH = path.join(process.cwd(), 'proto', 'venta.proto');
-        const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
-            keepCase: true,
-            longs: String,
-            enums: String,
-            defaults: true,
-            oneofs: true,
-        });
+const PROTO_PATH = path.join(process.cwd(), 'proto', 'venta.proto');
 
-        const ventaProto = require('@grpc/grpc-js').loadPackageDefinition(packageDefinition).ventas;
-        const client = new ventaProto.VentaService(
+const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
+    keepCase: true,
+    longs: String,
+    enums: String,
+    defaults: true,
+    oneofs: true,
+});
+
+const protoDescriptor = loadPackageDefinition(packageDefinition) as any;
+const ventaProto = protoDescriptor.ventas;
+
+// Cliente Singleton
+let client: any = null;
+
+function getClient() {
+    if (!client) {
+        client = new ventaProto.VentaService(
             'localhost:50051',
             credentials.createInsecure()
         );
+    }
+    return client;
+}
+
+export async function GET() {
+    try {
+        const grpcClient = getClient();
 
         return new Promise((resolve) => {
-            client.ObtenerEstadoNodos({}, (err: { message: any; }, response: { nodos: any; }) => {
+            grpcClient.ObtenerEstadoNodos({}, (err: any, response: any) => {
                 if (err) {
-                    resolve(Response.json({ nodos: [], error: err.message }, { status: 500 }));
+                    console.error("Error gRPC Estado:", err);
+                    // Retornamos array vacío para no romper el front
+                    resolve(NextResponse.json({ nodos: [] }));
                 } else {
-                    resolve(Response.json({ nodos: response.nodos }));
+                    resolve(NextResponse.json({ nodos: response.nodos || [] }));
                 }
             });
         });
-    } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        return Response.json({ nodos: [], error: message }, { status: 500 });
+
+    } catch (error: any) {
+        console.error("Error interno:", error.message);
+        return NextResponse.json({ nodos: [] }, { status: 500 });
     }
 }

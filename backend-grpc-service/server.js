@@ -2,6 +2,7 @@ const grpc = require("@grpc/grpc-js");
 const protoLoader = require("@grpc/proto-loader");
 const cassandra = require("cassandra-driver");
 const path = require("path");
+const net = require("net");
 const { v4: uuidv4 } = require("uuid");
 
 const PROTO_PATH = path.join(__dirname, "proto", "venta.proto");
@@ -14,73 +15,87 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
 });
 const ventaProto = grpc.loadPackageDefinition(packageDefinition).ventas;
 
-// Usar nombres de host en lugar de IPs para Docker
-const contactPoints = ["nodo1", "nodo2", "nodo3", "nodo4", "nodo5"];
+// --- CONFIGURACIÓN DE CONEXIÓN ---
+const contactPoints = [
+  "127.0.0.1:9042",
+  "127.0.0.1:9043",
+  "127.0.0.1:9044",
+  "127.0.0.1:9045",
+  "127.0.0.1:9046",
+];
 
 const client = new cassandra.Client({
   contactPoints: contactPoints,
   localDataCenter: "DC1",
-  keyspace: "proyecto",
-  socketOptions: {
-    connectTimeout: 5000,
-    readTimeout: 5000,
-  },
-  pooling: {
-    heartBeatInterval: 1000, // Verificar cada 1 segundo
-    coreConnectionsPerHost: {
-      [cassandra.types.distance.local]: 1,
-      [cassandra.types.distance.remote]: 1,
-    },
-  },
+  keyspace: "ventas",
+  socketOptions: { connectTimeout: 10000, readTimeout: 10000 },
   policies: {
-    reconnection:
-      new cassandra.policies.reconnection.ConstantReconnectionPolicy(1000),
-    loadBalancing: new cassandra.policies.loadBalancing.RoundRobinPolicy(),
+    loadBalancing: new cassandra.policies.loadBalancing.WhiteListPolicy(
+      new cassandra.policies.loadBalancing.RoundRobinPolicy(),
+      contactPoints
+    ),
   },
 });
 
-// Escuchar eventos del driver para debugging
-client.on("hostAdd", (host) => {
-  console.log(`✅ Nodo agregado: ${host.address}`);
-});
-
-client.on("hostRemove", (host) => {
-  console.log(`❌ Nodo removido: ${host.address}`);
-});
-
-client.on("hostUp", (host) => {
-  console.log(`🟢 Nodo UP: ${host.address}`);
-});
-
-client.on("hostDown", (host) => {
-  console.log(`🔴 Nodo DOWN: ${host.address}`);
-});
-
+// --- LÓGICA DE VENTAS ---
 async function registrarVenta(call, callback) {
-  const { producto, precio, region, pais } = call.request;
+  const {
+    producto,
+    precio,
+    region,
+    pais,
+    cliente_nombre,
+    cliente_apellido,
+    cliente_dni_ruc,
+  } = call.request;
+
   const id = uuidv4();
   const fecha = new Date();
-  const query =
-    "INSERT INTO ventas (id_venta, region, pais, producto, precio, fecha) VALUES (?, ?, ?, ?, ?, ?)";
+
+  const query = `
+    INSERT INTO ventas (
+      id_venta, region, fecha, pais, producto, precio, 
+      cliente_nombre, cliente_apellido, cliente_dni_ruc
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  const params = [
+    id,
+    region,
+    fecha,
+    pais,
+    producto,
+    precio,
+    cliente_nombre,
+    cliente_apellido,
+    cliente_dni_ruc,
+  ];
+
   try {
-    await client.execute(query, [id, region, pais, producto, precio, fecha], {
+    await client.execute(query, params, {
       prepare: true,
       consistency: cassandra.types.consistencies.localOne,
     });
+
     callback(null, {
       exito: true,
-      mensaje: "Guardado OK",
+      mensaje: "Venta registrada correctamente",
       id_generado: id.toString(),
     });
   } catch (error) {
-    console.error(error);
-    callback(null, { exito: false, mensaje: "Error BD", id_generado: "" });
+    console.error("Error BD al registrar:", error);
+    callback(null, {
+      exito: false,
+      mensaje: "Error interno al guardar en Cassandra",
+      id_generado: "",
+    });
   }
 }
 
 async function listarVentas(call, callback) {
   try {
-    const result = await client.execute("SELECT * FROM ventas");
+    const query = "SELECT * FROM ventas";
+    const result = await client.execute(query);
     const ventas = result.rows.map((row) => ({
       id_venta: row.id_venta.toString(),
       producto: row.producto,
@@ -88,73 +103,58 @@ async function listarVentas(call, callback) {
       region: row.region,
       pais: row.pais,
       fecha: row.fecha.toISOString(),
+      cliente_nombre: row.cliente_nombre || "",
+      cliente_apellido: row.cliente_apellido || "",
+      cliente_dni_ruc: row.cliente_dni_ruc || "",
     }));
+
     callback(null, { ventas: ventas });
   } catch (error) {
+    console.error("Error al listar ventas:", error);
     callback(null, { ventas: [] });
   }
 }
 
-// FUNCIÓN MEJORADA: Verificar estado real con timeout
-async function verificarNodoActivo(host) {
+// --- MONITOR DE ESTADO (Versión Ligera TCP) ---
+function checkNodeHealth(nombre, puerto) {
   return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      resolve(false); // Si tarda más de 2s, considerarlo DOWN
-    }, 2000);
-
-    // Intentar query simple para verificar
-    const testClient = new cassandra.Client({
-      contactPoints: [host],
-      localDataCenter: "DC1",
-      keyspace: "system",
-      socketOptions: { connectTimeout: 1500, readTimeout: 1500 },
+    const socket = new net.Socket();
+    let status = "DOWN";
+    socket.setTimeout(1000);
+    socket.on("connect", () => {
+      status = "UP";
+      socket.destroy();
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+    });
+    socket.on("error", (err) => {
+      socket.destroy();
+    });
+    socket.on("close", () => {
+      resolve({
+        nombre: nombre,
+        estado: status,
+        direccion: `127.0.0.1:${puerto}`,
+      });
     });
 
-    testClient
-      .execute("SELECT * FROM system.local LIMIT 1")
-      .then(() => {
-        clearTimeout(timeout);
-        testClient.shutdown();
-        resolve(true);
-      })
-      .catch(() => {
-        clearTimeout(timeout);
-        testClient.shutdown();
-        resolve(false);
-      });
+    socket.connect(puerto, "127.0.0.1");
   });
 }
 
 async function obtenerEstadoNodos(call, callback) {
-  let hosts = Array.from(client.hosts.values());
-
-  // Mapear a nombres conocidos
-  const nodosBase = [
-    { nombre: "Nodo 1", host: "nodo1", puerto: "9042" },
-    { nombre: "Nodo 2", host: "nodo2", puerto: "9043" },
-    { nombre: "Nodo 3", host: "nodo3", puerto: "9044" },
-    { nombre: "Nodo 4", host: "nodo4", puerto: "9045" },
-    { nombre: "Nodo 5", host: "nodo5", puerto: "9046" },
+  const definicionNodos = [
+    { nombre: "Nodo 1 (Seed)", puerto: 9042 },
+    { nombre: "Nodo 2", puerto: 9043 },
+    { nombre: "Nodo 3", puerto: 9044 },
+    { nombre: "Nodo 4", puerto: 9045 },
+    { nombre: "Nodo 5", puerto: 9046 },
   ];
-
-  // Verificar estado real de cada nodo
-  const estadoPromises = nodosBase.map(async (nodo) => {
-    const estaActivo = await verificarNodoActivo(nodo.host);
-    const estado = estaActivo ? "UP" : "DOWN";
-
-    console.log(
-      `🔍 Monitor: ${nodo.nombre} [${nodo.host}:${nodo.puerto}] -> ${estado}`
-    );
-
-    return {
-      nombre: nodo.nombre,
-      estado: estado,
-      direccion: `${nodo.host}:${nodo.puerto}`,
-    };
-  });
-
-  const estadoNodos = await Promise.all(estadoPromises);
-  callback(null, { nodos: estadoNodos });
+  const resultados = await Promise.all(
+    definicionNodos.map((n) => checkNodeHealth(n.nombre, n.puerto))
+  );
+  callback(null, { nodos: resultados });
 }
 
 function main() {
@@ -164,15 +164,20 @@ function main() {
     ListarVentas: listarVentas,
     ObtenerEstadoNodos: obtenerEstadoNodos,
   });
+
   server.bindAsync(
     "0.0.0.0:50051",
     grpc.ServerCredentials.createInsecure(),
     () => {
-      console.log("🚀 Backend corriendo en 50051");
+      console.log("🚀 Backend gRPC corriendo en puerto 50051");
+      console.log("📡 Conectando a cluster Cassandra (Keyspace: ventas)...");
+
       client
         .connect()
-        .then(() => console.log("✅ Conectado a Cassandra"))
-        .catch((e) => console.error("❌ Error conectando:", e));
+        .then(() => console.log("✅ Conexión a Cassandra EXITOSA"))
+        .catch((e) =>
+          console.error("❌ Error fatal conectando a Cassandra:", e.message)
+        );
     }
   );
 }

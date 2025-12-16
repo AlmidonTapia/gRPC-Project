@@ -15,6 +15,9 @@ message VentaRequest {
   float precio = 2;
   string region = 3;
   string pais = 4;
+  string cliente_nombre = 5;
+  string cliente_apellido = 6;
+  string cliente_dni_ruc = 7;
 }
 
 message VentaResponse {
@@ -30,6 +33,9 @@ message VentaDetalle {
   string region = 4;
   string pais = 5;
   string fecha = 6;
+  string cliente_nombre = 7;
+  string cliente_apellido = 8;
+  string cliente_dni_ruc = 9;
 }
 
 message ListaVentasResponse {
