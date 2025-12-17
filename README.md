@@ -1,4 +1,6 @@
 # Documentación del Sistema de Ventas Distribuido
+<img width="2721" height="2006" alt="localhost_3000_" src="https://github.com/user-attachments/assets/216f0bc1-2a67-4b45-8501-003f794c68df" />
+
 
 ## 1. Visión General del Proyecto
 Este proyecto simula un sistema de alta disponibilidad para el registro y monitoreo de ventas. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona.
