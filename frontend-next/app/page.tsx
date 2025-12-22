@@ -54,6 +54,18 @@ const SaveIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const ChevronLeft = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="15 18 9 12 15 6" />
+  </svg>
+);
+
+const ChevronRight = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
 export default function Home() {
   // --- ESTADOS ---
   const [form, setForm] = useState<FormState>({ 
@@ -71,6 +83,9 @@ export default function Home() {
   const [mensaje, setMensaje] = useState<MensajeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtroRegion, setFiltroRegion] = useState('TODAS');
+  // --- PAGINACION ---
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(50); 
 
   // --- EFECTOS ---
   useEffect(() => {
@@ -116,6 +131,27 @@ export default function Home() {
     }
   }, [mensaje]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filtroRegion]);
+  
+  // --- LÓGICA DE PAGINACIÓN ---
+  const ventasFiltradas = filtroRegion === 'TODAS' ? ventas : ventas.filter(v => v.region === filtroRegion);
+  
+  // Calcular índices
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  
+  // Obtener los items actuales (Corte del array)
+  const currentItems = ventasFiltradas.slice(indexOfFirstItem, indexOfLastItem);
+  
+  // Calcular total de páginas
+  const totalPages = Math.ceil(ventasFiltradas.length / itemsPerPage);
+
+  // Handlers de cambio de página
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
+  
   // envio del form
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -139,7 +175,6 @@ export default function Home() {
       
       if (data.exito) {
         setMensaje({ tipo: 'success', texto: `¡Venta guardada! ID: ${data.id_generado.substring(0,8)}...` });
-        // Resetear formulario completo
         setForm({ 
             ...form, 
             producto: '', 
@@ -159,7 +194,6 @@ export default function Home() {
     }
   };
 
-  const ventasFiltradas = filtroRegion === 'TODAS' ? ventas : ventas.filter(v => v.region === filtroRegion);
 
   const getBadgeColor = (region: string) => {
     const colors: Record<string, string> = { 
@@ -171,6 +205,8 @@ export default function Home() {
     };
     return colors[region] || 'bg-gray-50 text-gray-700 ring-gray-500/10';
   };
+  
+  
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans pb-20">
@@ -372,7 +408,7 @@ export default function Home() {
 
             {/* COLUMNA DERECHA: TABLA (8/12) */}
             <div className="lg:col-span-8">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden min-h-[500px]">
+                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
                     
                     {/* Toolbar de Tabla */}
                     <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
@@ -381,6 +417,18 @@ export default function Home() {
                             <p className="text-slate-400 text-xs">Datos sincronizados en tiempo real con el cluster</p>
                         </div>
                         <div className="flex items-center space-x-3">
+                            {/* Selector de Items por página */}
+                            <select 
+                                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 outline-none cursor-pointer"
+                                value={itemsPerPage}
+                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                            >
+                                <option value={5}>5 filas</option>
+                                <option value={10}>10 filas</option>
+                                <option value={20}>20 filas</option>
+                                <option value={50}>50 filas</option>
+                            </select>
+
                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtrar:</span>
                             <select 
                                 className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer font-medium" 
@@ -398,9 +446,9 @@ export default function Home() {
                     </div>
 
                     {/* Tabla */}
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto flex-grow">
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50/80 border-b border-slate-100">
+                            <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10 backdrop-blur-sm">
                             <tr>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
                                 <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Producto</th>
@@ -418,7 +466,8 @@ export default function Home() {
                                     </div>
                                 </td></tr>
                             ) : (
-                                ventasFiltradas.map((v) => (
+                                // USAMOS currentItems EN LUGAR DE ventasFiltradas
+                                currentItems.map((v) => (
                                 <tr key={v.id_venta} className="hover:bg-slate-50/80 transition-colors group">
                                     <td className="px-6 py-4">
                                         {v.cliente_dni_ruc && (
@@ -455,17 +504,40 @@ export default function Home() {
                             </tbody>
                         </table>
                     </div>
+
+                    {/* Footer con Paginación */}
                     <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex justify-between items-center">
-                        <span className="text-xs text-slate-400 font-medium">Mostrando {ventasFiltradas.length} registros</span>
-                        <div className="flex gap-1">
-                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                            <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
-                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                        
+                        {/* Row Count Detallado */}
+                        <div className="text-xs text-slate-500 font-medium">
+                            Mostrando <span className="font-bold text-slate-700">{ventasFiltradas.length > 0 ? indexOfFirstItem + 1 : 0}</span> a <span className="font-bold text-slate-700">{Math.min(indexOfLastItem, ventasFiltradas.length)}</span> de <span className="font-bold text-slate-700">{ventasFiltradas.length}</span> registros
+                        </div>
+                        
+                        {/* Controles de Paginación */}
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={prevPage}
+                                disabled={currentPage === 1}
+                                className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+                            
+                            <span className="text-xs font-medium text-slate-600 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
+                                Pág {currentPage} / {totalPages || 1}
+                            </span>
+
+                            <button 
+                                onClick={nextPage}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                                className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-
         </div>
       </div>
     </main>

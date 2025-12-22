@@ -113,6 +113,8 @@ services:
         condition: service_healthy
       nodo2:
         condition: service_healthy
+      nodo3:
+        condition: service_healthy
     volumes:
       - ./scripts/init.cql:/init.cql
     networks:
@@ -120,7 +122,7 @@ services:
     command: >
       bash -c "
       echo '⏳ Esperando a que el cluster se estabilice (Nodos 1 y 2)...' &&
-      sleep 10 && 
+      sleep 20 && 
       echo '✅ Nodos listos. Ejecutando init.cql...' &&
       cqlsh nodo1 9042 -f /init.cql &&
       echo '🚀 Inicialización COMPLETADA.'

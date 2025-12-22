@@ -21,5 +21,4 @@ CREATE TABLE IF NOT EXISTS ventas (
 
 -- Insertar un dato de prueba para verificar
 INSERT INTO ventas (id_venta, region, fecha, pais, producto, precio, cliente_nombre, cliente_apellido, cliente_dni_ruc)
-VALUES (uuid(), 'SUR', toTimestamp(now()), 'Peru', 'Venta de Prueba Init', 100.0, 'Admin', 'Sistema', '00000000')
-IF NOT EXISTS;
+VALUES (uuid(), 'SUR', toTimestamp(now()), 'Peru', 'Venta de Prueba Init', 100.0, 'Admin', 'Sistema', '00000000');
