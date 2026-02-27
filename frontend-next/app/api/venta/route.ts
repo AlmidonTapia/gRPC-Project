@@ -27,17 +27,21 @@ function getClient() {
     return client;
 }
 
-// 1. GET: Obtener historial
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(request.url);
+    const page_state = searchParams.get('pageState') || '';
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const filtro_region = searchParams.get('region') || 'TODAS';
+
     const clienteGrpc = getClient();
 
     return new Promise((resolve) => {
-        clienteGrpc.ListarVentas({}, (err: any, response: any) => {
+        clienteGrpc.ListarVentas({ page_state, limit, filtro_region }, (err: any, response: any) => {
             if (err) {
                 console.error("Error gRPC Listar:", err);
-                resolve(NextResponse.json({ ventas: [] }));
+                resolve(NextResponse.json({ ventas: [], nextPageState: "" }));
             } else {
-                resolve(NextResponse.json({ ventas: response.ventas || [] }));
+                resolve(NextResponse.json({ ventas: response.ventas || [], nextPageState: response.next_page_state || "" }));
             }
         });
     });
@@ -60,6 +64,62 @@ export async function POST(request: NextRequest) {
                 resolve(NextResponse.json({
                     exito: false,
                     mensaje: "Error de conexión con el servidor gRPC",
+                    id_generado: ""
+                }));
+            } else {
+                resolve(NextResponse.json(response));
+            }
+        });
+    });
+}
+
+export async function PUT(request: NextRequest) {
+    const clienteGrpc = getClient();
+    const body = await request.json();
+
+    const datosVenta = {
+        ...body,
+        precio: parseFloat(body.precio)
+    };
+
+    return new Promise((resolve) => {
+        clienteGrpc.ActualizarVenta(datosVenta, (err: any, response: any) => {
+            if (err) {
+                console.error("Error gRPC Actualizar:", err);
+                resolve(NextResponse.json({
+                    exito: false,
+                    mensaje: "Error de conexión con el servidor gRPC al actualizar",
+                    id_generado: ""
+                }));
+            } else {
+                resolve(NextResponse.json(response));
+            }
+        });
+    });
+}
+
+export async function DELETE(request: NextRequest) {
+    const clienteGrpc = getClient();
+    const { searchParams } = new URL(request.url);
+    const id_venta = searchParams.get('id_venta');
+    const region = searchParams.get('region');
+    const fecha = searchParams.get('fecha');
+
+    if (!id_venta || !region || !fecha) {
+        return NextResponse.json({
+            exito: false,
+            mensaje: "Se requieren id_venta, region y fecha para eliminar",
+            id_generado: ""
+        });
+    }
+
+    return new Promise((resolve) => {
+        clienteGrpc.EliminarVenta({ id_venta, region, fecha }, (err: any, response: any) => {
+            if (err) {
+                console.error("Error gRPC Eliminar:", err);
+                resolve(NextResponse.json({
+                    exito: false,
+                    mensaje: "Error de conexión con el servidor gRPC al eliminar",
                     id_generado: ""
                 }));
             } else {

@@ -3,13 +3,13 @@
 
 
 ## 1. Visión General del Proyecto
-Este proyecto simula un sistema de alta disponibilidad para el registro y monitoreo de ventas. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona.
+Este proyecto simula un sistema de alta disponibilidad para el registro, monitoreo y gestión de ventas de forma distribuida. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona comunicándose ágilmente a través de gRPC.
 
 ### Tecnologías Principales
 * **Frontend:** Next.js 14 (React) con Tailwind CSS **[Ejecución Local]**.
 * **Backend:** Node.js puro implementando el protocolo **gRPC** **[Ejecución Local]**.
-* **Base de Datos:** Cluster de **Apache Cassandra** (5 Nodos) con replicación.
-* **Infraestructura:** Docker & Docker Compose (Solo para la capa de datos).
+* **Base de Datos:** Cluster de **Apache Cassandra** (5 Nodos) con replicación `SimpleStrategy`.
+* **Infraestructura:** Docker & Docker Compose (Para el ecosistema de datos).
 
 ---
 
@@ -17,77 +17,57 @@ Este proyecto simula un sistema de alta disponibilidad para el registro y monito
 
 El flujo de datos atraviesa el entorno local y el entorno virtualizado:
 
-1. **Cliente (Navegador):** Interactúa con la interfaz en `localhost:3000`.
-2. **API Gateway (Next.js):** Recibe HTTP y conecta al Backend local vía gRPC (`localhost:50051`).
-3. **Backend gRPC:** Procesa la lógica y se conecta al Cluster Cassandra mediante los puertos expuestos en el host (`localhost:9042` a `9046`).
-4. **Cassandra Cluster (Docker):** Los contenedores reciben la data a través del mapeo de puertos y replican la información internamente en la red de Docker.
----
-
-## 3. Infraestructura (Docker & Cassandra)
-
-La infraestructura se define en `docker-compose.yml`. El cluster está diseñado para ser autónomo y autorreparable.
-
-### Componentes Clave:
-* **Red Personalizada (`red-bd-distribuida`):** Usamos una subred con IPs estáticas (`172.25.0.0/16`) para evitar problemas de descubrimiento (gossip) entre nodos cuando se reinician.
-* **Nodos de Cassandra (5 Contenedores):**
-    * Cada nodo expone su puerto interno `9042` a un puerto distinto en tu PC (`9042`, `9043`, `9044`, `9045`, `9046`).
-    * **Objetivo:** Permitir que el Backend (que corre fuera de Docker) pueda conectarse a cualquiera de los nodos.
-* **Inicializador Automático (`cassandra-init`):**
-    * Es un contenedor efímero.
-    * **Lógica:** Espera a que exista un **Quorum** (Nodo 1 y Nodo 2 saludables) para asegurar consistencia.
-    * **Acción:** Ejecuta el script `init.cql` que crea el *Keyspace* y la *Tabla* automáticamente. Luego se apaga.
+1. **Cliente (Navegador):** Interactúa con la interfaz reactiva en `localhost:3000`.
+2. **API Gateway (Next.js):** Recibe solicitudes HTTP y se conecta al Backend local vía el protocolo binario gRPC (`localhost:50051`).
+3. **Backend gRPC:** Sirve como el orquestador principal de la lógica empresarial, enrutando comandos al Cluster Cassandra mediante los puertos expuestos (`localhost:9042` a `9046`). Aquí también emite comandos hacia el *Docker CLI* del sistema operativo mediante procesos en segundo plano.
+4. **Cassandra Cluster (Docker):** Los contenedores reciben la data, logrando distribución y partición escalable mediante la red en Docker.
 
 ---
 
-## 4. Backend (Lógica y Comunicación)
+## 3. Infraestructura y Funciones Avanzadas 
 
-El cerebro del sistema, ubicado en `/backend-grpc-service`. Se ejecuta como un proceso de Node.js en tu máquina.
+### Nodos Cassandra (5 Contenedores)
+Nuestra infraestructura descansa sobre 5 contenedores Cassandra orquestados. El backend se conecta bajo técnicas como `RoundRobinPolicy`.
+* **Manejo de Nodos (Node Control):** ¡El sistema ofrece **control interactivo en tiempo real** de los Nodos! A través de la visualización del cluster en nuestro Monitor en el Frontend, puedes encender, apagar y reiniciar cada infraestructura con un clic. El backend gRPC procesará esto delegando comandos como `docker start nodo2` a la propia máquina virtual (Host).
 
-### Protocolo gRPC (`venta.proto`)
-Define el contrato estricto de comunicación.
-* **Servicios:** `RegistrarVenta`, `ListarVentas`, `ObtenerEstadoNodos`.
-* **Mensajes:** Estructuras tipadas (string, float) que incluyen los nuevos datos del cliente (`cliente_nombre`, `cliente_dni_ruc`, etc.).
-
-### Servidor (`server.js`)
-* **Conexión a BD:** Utiliza `cassandra-driver` con políticas de balanceo de carga (*RoundRobin*) y lista blanca de IPs.
-* **Healthcheck TCP:** Implementa una función personalizada utilizando `net.Socket` para verificar si los puertos `9042` de los nodos están abiertos, permitiendo al frontend saber qué nodos están "UP" o "DOWN" en tiempo real.
-* **Lógica de Negocio:**
-    * Genera UUIDs únicos para cada venta.
-    * Inserta datos con consistencia `LOCAL_ONE` (prioriza velocidad).
-    * Transforma los resultados de Cassandra a objetos JSON limpios.
+### Inicializador de Semilla Automático (`seed_data`)
+* **Poblado Autónomo:** Si el Host arranca bajo una base de datos recién creada, el programa interceptor del backend en Node (`seed_data.js`) inyectará automáticamente un set total de **250 registros** repartidos entre cada región para que la aplicación siempre tenga datos visualizables bajo pruebas sin necesidad de rutinas manuales.
 
 ---
 
-## 5. Frontend (Interfaz y Sincronización)
+## 4. Backend (Protocolo y Lógica)
 
-La cara del sistema, ubicada en /frontend-next. Se ejecuta como un servidor de desarrollo Next.js en tu máquina.
+El cerebro de servicios de alta velocidad está construido sobre gRPC. 
 
-### Interfaz de Usuario (`page.tsx`)
-* **Diseño:** Dashboard moderno con indicadores de estado en tiempo real.
-* **Gestión de Estado:** Usa `useState` para manejar el formulario, la lista de ventas y el estado de los nodos.
+### Protocolo `venta.proto`
+* **Servicios Activos:** `RegistrarVenta`, `ListarVentas`, `ActualizarVenta`, `EliminarVenta`, `ObtenerEstadoNodos`, `ControlarNodo`.
+* **Paginación Inteligente:** La transferencia de los historiales de ventas utiliza "Tokens de Página" (Page States) en lugar de *Offsets*, dándole a Cassandra una extrema agilidad para devolver páginas continuas sin saturaciones de memoria causadas por lectura de nodos lentos.
+
+### Restricciones Superadas de Base de Datos
+Debido a la naturaleza inmutable del modelo orientado a particiones en Cassandra, la lógica de actualización en nuestro Backend incluye validaciones dinámicas: Si un usuario *"edita"* la venta cambiándola de región, el Backend creará un túnel borrando el remanente en la partición antigua e insertándola lógicamente en la nueva área geográfica, un proceso completamente invisible al usuario.
+
+---
+
+## 5. Frontend (Dashboard)
+
+Ubicada en `/frontend-next`. Servidor Next.js.
+* **CRUD Completo Visual:** Experiencia de usuario optimizada con modales contextualizados.
+* **Experiencia Editable:** Un dinámico ambiente visual índigo indica al cliente que se halla en estado "Modo Edición" tras seleccionar una compra, transformando el panel lateral.
 * **Polling (Sincronización):**
-    * `setInterval` cada **2 segundos**: Consulta la salud de los servidores.
-    * `setInterval` cada **5 segundos**: Actualiza la tabla de ventas.
-    * Esto simula una experiencia "tiempo real" sin la complejidad de WebSockets.
-
-### API Routes (`api/venta/route.ts` y `api/estado/route.ts`)
-Next.js actúa como intermediario. El navegador no puede hablar gRPC directamente, por lo que estas rutas:
-1.  Reciben JSON del `fetch` del cliente.
-2.  **Patrón Singleton:** Mantienen una única conexión gRPC abierta (reutilizando el cliente) para no saturar el servidor.
-3.  Convierten los tipos de datos (ej. `precio` de String a Float).
-4.  Envían la petición al contenedor `backend` y devuelven la respuesta.
+    * Refresca las verificaciones **TCP Socket** de cada Nodo cada 2 segundos.
+    * Mantiene las transacciones visuales actualizadas cargando siempre la paginación activa.
 
 ---
 
 ## 6. Base de Datos (Modelo de Datos)
 
-El esquema CQL está optimizado para lecturas rápidas ordenadas por fecha.
+El esquema CQL está optimizado para lecturas sin coste y reubicar rápidamente.
 
 ```sql
 CREATE TABLE ventas (
-    region text,           -- Partition Key (Agrupa datos por zona física)
-    fecha timestamp,       -- Clustering Key (Ordena descendentemente)
-    id_venta uuid,         -- Clustering Key (Asegura unicidad)
+    region text,           -- Partition Key (Agrupa datos y dicta en qué nodo ir)
+    fecha timestamp,       -- Clustering Key (Ordena cronológicamente hacia abajo)
+    id_venta uuid,         -- Clustering Key (Asegura unicidad final)
     pais text,
     producto text,
     precio float,
@@ -97,51 +77,32 @@ CREATE TABLE ventas (
     PRIMARY KEY ((region), fecha, id_venta)
 ) WITH CLUSTERING ORDER BY (fecha DESC, id_venta ASC);
 ```
-### Detalles de la Clave Primaria:
-*   **Partition Key (`region`):** Permite que el cluster distribuya la carga. Las ventas de diferentes regiones pueden vivir en nodos distintos, optimizando el almacenamiento físico.
-*   **Clustering Key (`fecha DESC`):** Optimiza el dashboard, devolviendo automáticamente las ventas más recientes sin costo computacional adicional en la consulta (evita el uso de `ORDER BY` en tiempo de ejecución).
 
 ---
 
-## 7. Cómo Ejecutar el Proyecto
+## 7. Instrucciones Rápida de Ejecución
 
-Al no estar todo dockerizado, necesitas levantar los servicios en 3 terminales distintas.
+Debido a su naturaleza distribuida híbrida, el programa fluye levantando 3 ecosistemas separados en 3 partes de la consola:
 
-### Requisitos Previos
-*   Tener instalado [Docker Desktop](www.docker.com).
-*   Contar con la estructura de carpetas: `/frontend`, `/backend`, `/proto`, y `/scripts`.
+### 1. Levantar el Cluster Cassandra (El enjambre de datos)
+Abre una terminal en la raíz del proyecto.
+```bash
+docker-compose up -d
+```
+> Nota: El auto-creador se activará solo, armando el andamiaje del Keyspace.
 
-### Paso 1: Levantar la Base de Datos
-1.  Abre una terminal en la raíz del proyecto.
-2.  Ejecuta el siguiente comando para construir y levantar los contenedores:
-    ```bash
-    docker-compose up -d
-    ```
-**Verificación:** Espera a que el contenedor cassandra-init termine su trabajo (verás "Inicialización COMPLETADA" en los logs o usando docker logs cassandra-init).
+### 2. Poner en Órbita el Motor gRPC (Backend)
+```bash
+cd backend-grpc-service
+npm install
+node server.js
+```
+> Si la BD ya nació lista, aquí presenciarás el script que introduce los **250 datos semilla automáticamente** a la velocidad de la luz.
 
-### Paso 2: Iniciar el Backend (Local)
-1. Abre otra terminal y navega hacia la ruta del backend.
-    ```bash
-    cd backend-grpc-service
-    ```
-2.  Ejecuta el siguiente comando para instalar todas las dependencias y e inicar el servidor
-    ```bash
-    npm install
-    node server.js
-    ```
-
-> **Verificación** Deberías ver: 🚀 Backend gRPC corriendo y ✅ Conexión a Cassandra EXITOSA.
-
-### Paso 3: 
-1. Abre otra terminal y navega hacia la ruta del frontend.
-    ```bash
-    cd frontend-next
-    ```
-2.  Ejecuta el siguiente comando para instalar todas las dependencias y e inicar el servidor
-    ```bash
-    npm install
-    npm run dev
-    ```
-> **Verificación** Una vez finalizado el proceso, puedes ingresar al sistema desde tu navegador en: [http://localhost:3000](http://localhost:3000).
-
-* **⚠️NOTA** El orden es importante. Cassandra debe estar lista antes de iniciar el Backend, y el Backend debe estar listo antes de usar el Frontend.
+### 3. Lanzar la Visualización Interactiva Monitor (Frontend)
+```bash
+cd frontend-next
+npm install
+npm run dev
+```
+> Accede navegando hacia [http://localhost:3000](http://localhost:3000) en tu navegador.
