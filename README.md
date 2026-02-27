@@ -1,17 +1,15 @@
-# Documentación del Sistema de Ventas Distribuido
-<img width="2721" height="2006" alt="localhost_3000_" src="https://github.com/user-attachments/assets/216f0bc1-2a67-4b45-8501-003f794c68df" />
+# Sistema Distribuido gRPC 
+<img width="2880" height="2460" alt="localhost_3000_ (1)" src="https://github.com/user-attachments/assets/fb3d621a-fdfe-45e7-abea-696b92966f43" />
 
-
-## 1. Visión General del Proyecto
+  
 Este proyecto simula un sistema de alta disponibilidad para el registro, monitoreo y gestión de ventas de forma distribuida. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona comunicándose ágilmente a través de gRPC.
 
-### Tecnologías Principales
-* **Frontend:** Next.js 14 (React) con Tailwind CSS **[Ejecución Local]**.
-* **Backend:** Node.js puro implementando el protocolo **gRPC** **[Ejecución Local]**.
+## 1. Tecnologías Principales
+* **Frontend:** Next.js 14 (React) con Tailwind CSS.
+* **Backend:** Node.js puro implementando el protocolo **gRPC**.
 * **Base de Datos:** Cluster de **Apache Cassandra** (5 Nodos) con replicación `SimpleStrategy`.
-* **Infraestructura:** Docker & Docker Compose (Para el ecosistema de datos).
+* **Infraestructura:** Docker & Docker Compose.
 
----
 
 ## 2. Arquitectura del Sistema
 
@@ -97,7 +95,7 @@ cd backend-grpc-service
 npm install
 node server.js
 ```
-> Si la BD ya nació lista, aquí presenciarás el script que introduce los **250 datos semilla automáticamente** a la velocidad de la luz.
+> Si la BD ya esta lista, aquí se introducen los **250 datos semilla automáticamente**.
 
 ### 3. Lanzar la Visualización Interactiva Monitor (Frontend)
 ```bash
