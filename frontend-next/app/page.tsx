@@ -86,18 +86,6 @@ const RefreshIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const ChevronLeft = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="15 18 9 12 15 6" />
-  </svg>
-);
-
-const ChevronRight = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <polyline points="9 18 15 12 9 6" />
-  </svg>
-);
-
 export default function Home() {
   // --- ESTADOS ---
   const [form, setForm] = useState<FormState>({
@@ -117,11 +105,6 @@ export default function Home() {
   const [mensaje, setMensaje] = useState<MensajeState | null>(null);
   const [loading, setLoading] = useState(true);
   const [filtroRegion, setFiltroRegion] = useState('TODAS');
-<<<<<<< HEAD
-  // --- PAGINACION ---
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(50); 
-=======
   const filtroRegionRef = useRef('TODAS');
 
   const [modalConfirmacion, setModalConfirmacion] = useState<{
@@ -143,7 +126,6 @@ export default function Home() {
     currentPageRef.current = nuevoIndex;
     pageStatesRef.current = nuevosStates;
   };
->>>>>>> develop
 
   // --- EFECTOS ---
   useEffect(() => {
@@ -224,27 +206,6 @@ export default function Home() {
     }
   }, [mensaje]);
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [filtroRegion]);
-  
-  // --- LÓGICA DE PAGINACIÓN ---
-  const ventasFiltradas = filtroRegion === 'TODAS' ? ventas : ventas.filter(v => v.region === filtroRegion);
-  
-  // Calcular índices
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  
-  // Obtener los items actuales (Corte del array)
-  const currentItems = ventasFiltradas.slice(indexOfFirstItem, indexOfLastItem);
-  
-  // Calcular total de páginas
-  const totalPages = Math.ceil(ventasFiltradas.length / itemsPerPage);
-
-  // Handlers de cambio de página
-  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-  
   // envio del form
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -271,18 +232,6 @@ export default function Home() {
       const data = await res.json();
 
       if (data.exito) {
-<<<<<<< HEAD
-        setMensaje({ tipo: 'success', texto: `¡Venta guardada! ID: ${data.id_generado.substring(0,8)}...` });
-        setForm({ 
-            ...form, 
-            producto: '', 
-            precio: '',
-            cliente_nombre: '',
-            cliente_apellido: '',
-            cliente_dni_ruc: ''
-        }); 
-        cargarVentas(); 
-=======
         setMensaje({ tipo: 'success', texto: isEditing ? '¡Venta actualizada!' : `¡Venta guardada! ID: ${data.id_generado.substring(0, 8)}...` });
         // Resetear formulario completo
         setForm({
@@ -296,7 +245,6 @@ export default function Home() {
           cliente_dni_ruc: ''
         });
         cargarVentas();
->>>>>>> develop
       } else {
         setMensaje({ tipo: 'error', texto: `Error: ${data.mensaje}` });
       }
@@ -307,8 +255,6 @@ export default function Home() {
     }
   };
 
-<<<<<<< HEAD
-=======
   const handleEdit = (v: Venta) => {
     setForm({
       id_venta: v.id_venta,
@@ -370,7 +316,6 @@ export default function Home() {
   };
 
 
->>>>>>> develop
 
   const getBadgeColor = (region: string) => {
     const colors: Record<string, string> = {
@@ -382,8 +327,6 @@ export default function Home() {
     };
     return colors[region] || 'bg-gray-50 text-gray-700 ring-gray-500/10';
   };
-  
-  
 
   return (
     <main className="min-h-screen bg-slate-50 font-sans pb-20">
@@ -643,147 +586,12 @@ export default function Home() {
                 </div>
               </form>
 
-<<<<<<< HEAD
-            {/* COLUMNA DERECHA: TABLA (8/12) */}
-            <div className="lg:col-span-8">
-                <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
-                    
-                    {/* Toolbar de Tabla */}
-                    <div className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                        <div>
-                            <h2 className="font-bold text-slate-800 text-lg">Historial de Operaciones</h2>
-                            <p className="text-slate-400 text-xs">Datos sincronizados en tiempo real con el cluster</p>
-                        </div>
-                        <div className="flex items-center space-x-3">
-                            {/* Selector de Items por página */}
-                            <select 
-                                className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 outline-none cursor-pointer"
-                                value={itemsPerPage}
-                                onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                            >
-                                <option value={5}>5 filas</option>
-                                <option value={10}>10 filas</option>
-                                <option value={20}>20 filas</option>
-                                <option value={50}>50 filas</option>
-                            </select>
-
-                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Filtrar:</span>
-                            <select 
-                                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none cursor-pointer font-medium" 
-                                value={filtroRegion} 
-                                onChange={(e) => setFiltroRegion(e.target.value)}
-                            >
-                                <option value="TODAS">Todas las Regiones</option>
-                                <option value="SUR">Sur</option>
-                                <option value="NORTE">Norte</option>
-                                <option value="CENTRO">Centro</option>
-                                <option value="ESTE">Este</option>
-                                <option value="OESTE">Oeste</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Tabla */}
-                    <div className="overflow-x-auto flex-grow">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50/80 border-b border-slate-100 sticky top-0 z-10 backdrop-blur-sm">
-                            <tr>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Cliente</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Producto</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Región</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Precio</th>
-                                <th className="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Fecha</th>
-                            </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                            {ventasFiltradas.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-20 text-center">
-                                    <div className="flex flex-col items-center justify-center text-slate-300">
-                                        <svg className="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
-                                        <p className="text-sm font-medium">No hay datos registrados en esta vista.</p>
-                                    </div>
-                                </td></tr>
-                            ) : (
-                                // USAMOS currentItems EN LUGAR DE ventasFiltradas
-                                currentItems.map((v) => (
-                                <tr key={v.id_venta} className="hover:bg-slate-50/80 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        {v.cliente_dni_ruc && (
-                                            <>
-                                                <div className="font-bold text-slate-700 text-xs">
-                                                    {(v.cliente_nombre || '') + ' ' + (v.cliente_apellido || '')}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 font-mono">
-                                                    ID: {v.cliente_dni_ruc}
-                                                </div>
-                                            </>
-                                        )}
-                                        {!v.cliente_dni_ruc && <span className="text-slate-300 text-xs italic">Anónimo</span>}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-medium text-slate-700 group-hover:text-indigo-600 transition-colors">{v.producto}</div>
-                                        <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">{v.pais}</div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-bold ring-1 ring-inset uppercase tracking-wide ${getBadgeColor(v.region)}`}>
-                                            {v.region}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="font-mono font-semibold text-slate-600 bg-slate-100 inline-block px-2 py-1 rounded-md border border-slate-200">
-                                            ${typeof v.precio === 'number' ? v.precio.toFixed(2) : v.precio}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs text-slate-400 font-medium">
-                                        {new Date(v.fecha).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
-                                    </td>
-                                </tr>
-                            )))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Footer con Paginación */}
-                    <div className="bg-slate-50 px-6 py-3 border-t border-slate-100 flex justify-between items-center">
-                        
-                        {/* Row Count Detallado */}
-                        <div className="text-xs text-slate-500 font-medium">
-                            Mostrando <span className="font-bold text-slate-700">{ventasFiltradas.length > 0 ? indexOfFirstItem + 1 : 0}</span> a <span className="font-bold text-slate-700">{Math.min(indexOfLastItem, ventasFiltradas.length)}</span> de <span className="font-bold text-slate-700">{ventasFiltradas.length}</span> registros
-                        </div>
-                        
-                        {/* Controles de Paginación */}
-                        <div className="flex items-center gap-2">
-                            <button 
-                                onClick={prevPage}
-                                disabled={currentPage === 1}
-                                className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
-                            >
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            
-                            <span className="text-xs font-medium text-slate-600 bg-white px-3 py-1 rounded-md border border-slate-200 shadow-sm">
-                                Pág {currentPage} / {totalPages || 1}
-                            </span>
-
-                            <button 
-                                onClick={nextPage}
-                                disabled={currentPage === totalPages || totalPages === 0}
-                                className="p-1.5 rounded-lg hover:bg-white hover:shadow-sm border border-transparent hover:border-slate-200 transition-all disabled:opacity-30 disabled:cursor-not-allowed text-slate-600"
-                            >
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
-                    </div>
-=======
               {mensaje && (
                 <div className={`m-6 mt-0 p-4 rounded-xl text-xs text-center font-medium border ${mensaje.tipo === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
                   {mensaje.texto}
->>>>>>> develop
                 </div>
               )}
             </div>
-<<<<<<< HEAD
-=======
           </div>
 
           {/* COLUMNA DERECHA: TABLA (8/12) */}
@@ -928,7 +736,6 @@ export default function Home() {
             </div>
           </div>
 
->>>>>>> develop
         </div>
       </div>
       {modalConfirmacion && (
