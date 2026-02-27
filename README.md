@@ -1,17 +1,15 @@
-# Documentación del Sistema de Ventas Distribuido
-<img width="2721" height="2006" alt="localhost_3000_" src="https://github.com/user-attachments/assets/216f0bc1-2a67-4b45-8501-003f794c68df" />
+# Sistema Distribuido gRPC 
+<img width="2880" height="2460" alt="localhost_3000_ (1)" src="https://github.com/user-attachments/assets/fb3d621a-fdfe-45e7-abea-696b92966f43" />
 
-
-## 1. Visión General del Proyecto
+  
 Este proyecto simula un sistema de alta disponibilidad para el registro, monitoreo y gestión de ventas de forma distribuida. Utiliza una **arquitectura híbrida**: la base de datos corre en un cluster de contenedores Docker, mientras que las aplicaciones (Backend y Frontend) se ejecutan localmente en la máquina anfitriona comunicándose ágilmente a través de gRPC.
 
-### Tecnologías Principales
-* **Frontend:** Next.js 14 (React) con Tailwind CSS **[Ejecución Local]**.
-* **Backend:** Node.js puro implementando el protocolo **gRPC** **[Ejecución Local]**.
+## 1. Tecnologías Principales
+* **Frontend:** Next.js 14 (React) con Tailwind CSS.
+* **Backend:** Node.js puro implementando el protocolo **gRPC**.
 * **Base de Datos:** Cluster de **Apache Cassandra** (5 Nodos) con replicación `SimpleStrategy`.
-* **Infraestructura:** Docker & Docker Compose (Para el ecosistema de datos).
+* **Infraestructura:** Docker & Docker Compose.
 
----
 
 ## 2. Arquitectura del Sistema
 
@@ -26,7 +24,7 @@ El flujo de datos atraviesa el entorno local y el entorno virtualizado:
 
 ## 3. Infraestructura y Funciones Avanzadas 
 
-### Nodos Cassandra (5 Contenedores)
+### Nodos Cassandra
 Nuestra infraestructura descansa sobre 5 contenedores Cassandra orquestados. El backend se conecta bajo técnicas como `RoundRobinPolicy`.
 * **Manejo de Nodos (Node Control):** ¡El sistema ofrece **control interactivo en tiempo real** de los Nodos! A través de la visualización del cluster en nuestro Monitor en el Frontend, puedes encender, apagar y reiniciar cada infraestructura con un clic. El backend gRPC procesará esto delegando comandos como `docker start nodo2` a la propia máquina virtual (Host).
 
@@ -35,9 +33,7 @@ Nuestra infraestructura descansa sobre 5 contenedores Cassandra orquestados. El 
 
 ---
 
-## 4. Backend (Protocolo y Lógica)
-
-El cerebro de servicios de alta velocidad está construido sobre gRPC. 
+## 4. Backend 
 
 ### Protocolo `venta.proto`
 * **Servicios Activos:** `RegistrarVenta`, `ListarVentas`, `ActualizarVenta`, `EliminarVenta`, `ObtenerEstadoNodos`, `ControlarNodo`.
@@ -48,7 +44,7 @@ Debido a la naturaleza inmutable del modelo orientado a particiones en Cassandra
 
 ---
 
-## 5. Frontend (Dashboard)
+## 5. Frontend
 
 Ubicada en `/frontend-next`. Servidor Next.js.
 * **CRUD Completo Visual:** Experiencia de usuario optimizada con modales contextualizados.
@@ -59,7 +55,7 @@ Ubicada en `/frontend-next`. Servidor Next.js.
 
 ---
 
-## 6. Base de Datos (Modelo de Datos)
+## 6. Base de Datos
 
 El esquema CQL está optimizado para lecturas sin coste y reubicar rápidamente.
 
@@ -97,7 +93,7 @@ cd backend-grpc-service
 npm install
 node server.js
 ```
-> Si la BD ya nació lista, aquí presenciarás el script que introduce los **250 datos semilla automáticamente** a la velocidad de la luz.
+> Si la BD ya esta lista, aquí se introducen los **250 datos semilla automáticamente**.
 
 ### 3. Lanzar la Visualización Interactiva Monitor (Frontend)
 ```bash
