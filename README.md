@@ -24,7 +24,7 @@ El flujo de datos atraviesa el entorno local y el entorno virtualizado:
 
 ## 3. Infraestructura y Funciones Avanzadas 
 
-### Nodos Cassandra (5 Contenedores)
+### Nodos Cassandra
 Nuestra infraestructura descansa sobre 5 contenedores Cassandra orquestados. El backend se conecta bajo técnicas como `RoundRobinPolicy`.
 * **Manejo de Nodos (Node Control):** ¡El sistema ofrece **control interactivo en tiempo real** de los Nodos! A través de la visualización del cluster en nuestro Monitor en el Frontend, puedes encender, apagar y reiniciar cada infraestructura con un clic. El backend gRPC procesará esto delegando comandos como `docker start nodo2` a la propia máquina virtual (Host).
 
@@ -33,9 +33,7 @@ Nuestra infraestructura descansa sobre 5 contenedores Cassandra orquestados. El 
 
 ---
 
-## 4. Backend (Protocolo y Lógica)
-
-El cerebro de servicios de alta velocidad está construido sobre gRPC. 
+## 4. Backend 
 
 ### Protocolo `venta.proto`
 * **Servicios Activos:** `RegistrarVenta`, `ListarVentas`, `ActualizarVenta`, `EliminarVenta`, `ObtenerEstadoNodos`, `ControlarNodo`.
@@ -46,7 +44,7 @@ Debido a la naturaleza inmutable del modelo orientado a particiones en Cassandra
 
 ---
 
-## 5. Frontend (Dashboard)
+## 5. Frontend
 
 Ubicada en `/frontend-next`. Servidor Next.js.
 * **CRUD Completo Visual:** Experiencia de usuario optimizada con modales contextualizados.
@@ -57,7 +55,7 @@ Ubicada en `/frontend-next`. Servidor Next.js.
 
 ---
 
-## 6. Base de Datos (Modelo de Datos)
+## 6. Base de Datos
 
 El esquema CQL está optimizado para lecturas sin coste y reubicar rápidamente.
 
