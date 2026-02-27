@@ -4,12 +4,31 @@ package ventas;
 
 service VentaService {
   rpc RegistrarVenta (VentaRequest) returns (VentaResponse);
-  rpc ListarVentas (Empty) returns (ListaVentasResponse);
+  rpc ListarVentas (ListarVentasRequest) returns (ListaVentasResponse);
   rpc ObtenerEstadoNodos (Empty) returns (EstadoNodosResponse);
+  rpc ActualizarVenta (ActualizarVentaRequest) returns (VentaResponse);
+  rpc EliminarVenta (EliminarVentaRequest) returns (VentaResponse);
+  rpc ControlarNodo (ControlNodoRequest) returns (ControlNodoResponse);
+  rpc ObtenerEstadisticas (Empty) returns (EstadisticasResponse);
 }
 
 message Empty {}
 
+message EstadisticaRegion {
+  string region = 1;
+  int32 total = 2;
+}
+
+message EstadisticasResponse {
+  int32 total_registros = 1;
+  repeated EstadisticaRegion registros_por_region = 2;
+}
+
+message ListarVentasRequest {
+  string page_state = 1;
+  int32 limit = 2;
+  string filtro_region = 3;
+}
 
 message VentaRequest {
   string producto = 1;
@@ -20,6 +39,25 @@ message VentaRequest {
   string cliente_nombre = 5;
   string cliente_apellido = 6;
   string cliente_dni_ruc = 7;
+}
+
+message ActualizarVentaRequest {
+  string id_venta = 1;
+  string producto = 2;
+  float precio = 3;
+  string region = 4;
+  string pais = 5;
+  string cliente_nombre = 6;
+  string cliente_apellido = 7;
+  string cliente_dni_ruc = 8;
+  string fecha = 9;
+  string region_original = 10;
+}
+
+message EliminarVentaRequest {
+  string id_venta = 1;
+  string region = 2;
+  string fecha = 3;
 }
 
 message VentaResponse {
@@ -44,6 +82,7 @@ message VentaDetalle {
 
 message ListaVentasResponse {
   repeated VentaDetalle ventas = 1;
+  string next_page_state = 2;
 }
 
 message NodoInfo {
@@ -54,4 +93,14 @@ message NodoInfo {
 
 message EstadoNodosResponse {
   repeated NodoInfo nodos = 1;
+}
+
+message ControlNodoRequest {
+  string nombre_nodo = 1;
+  string accion = 2; // "start", "stop", "restart"
+}
+
+message ControlNodoResponse {
+  bool exito = 1;
+  string mensaje = 2;
 }
